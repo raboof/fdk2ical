@@ -55,7 +55,7 @@ trait Main {
     val starttime = "\\d+:\\d+".r.findFirstIn(data("Geopend:")).getOrElse("00:00")
 
     Event(
-      uid = Uid(s"vvvdeventer2ical-$id"),
+      uid = Uid(s"fdk2ical-$id"),
       dtstart =
         ZonedDateTime.parse(s"${date}T${starttime}+02:00[Europe/Amsterdam]").withZoneSameInstant(ZoneOffset.UTC),
       summary = Summary(Text.fromString(article >> text("h1"))),
@@ -68,7 +68,6 @@ trait Main {
   def fetchDocument(uri: String): Future[Document] = {
     val browser = JsoupBrowser()
 
-    // JsoupBrowser.get expects UTF-8, vvvdeventer is windows codepage
     Http(dispatch.url(uri) OK dispatch.as.String).map {
       val doc = browser.parseString(_)
       doc
