@@ -5,10 +5,16 @@ import java.time._
 import scala.language.implicitConversions
 import scala.language.postfixOps
 
-import dispatch.Http
-
 import scala.concurrent._
 import scala.concurrent.duration._
+
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Sink
+import akka.http._
+import akka.http.scaladsl._
+import akka.http.scaladsl.model._
+import akka.util.ByteString
 
 import icalendar._
 import icalendar.Properties._
@@ -25,6 +31,9 @@ import net.ruippeixotog.scalascraper.dsl.DSL.Extract._
 import net.ruippeixotog.scalascraper.dsl.DSL.Parse._
 
 trait Main {
+  implicit val system = ActorSystem()
+  implicit val mat = ActorMaterializer()
+
   import scala.util.Try
   object ToInt {
     def unapply(in: String): Option[Int] = Try(in.toInt).toOption
@@ -68,10 +77,12 @@ trait Main {
   def fetchDocument(uri: String): Future[Document] = {
     val browser = JsoupBrowser()
 
-    Http(dispatch.url(uri) OK dispatch.as.String).map {
-      val doc = browser.parseString(_)
-      doc
-    }
+    Http().singleRequest(HttpRequest(uri = uri))
+      .flatMap(_.entity.dataBytes.runWith(Sink.reduce[ByteString](_ ++ _)))
+      .map { bytes =>
+        val doc = browser.parseString(bytes.utf8String)
+        doc
+      }
   }
 
   def event(element: Element): Event = {
@@ -95,7 +106,10 @@ trait Main {
     )
   }
 
-  def events(doc: Document): Iterable[Event] = (doc >> elements(".movie_event")).map(event(_))
+  def events(doc: Document): Iterable[Event] = {
+    println("Got doc")
+    (doc >> elements(".movie_event")).map(event(_))
+  }
 
   def fetchCalendar(): String = {
     val urlPrefix = "https://www.filmhuisdekeizer.nl/programma/"
@@ -120,4 +134,5 @@ class MainLambda extends Main {
 
 object MainApp extends App with Main {
   print(fetchCalendar())
+  system.terminate()
 }
